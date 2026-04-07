@@ -1,0 +1,22 @@
+# Your active projects - the agent uses these to find relevant repos and tools
+# Copy this file to projects.yaml and describe your projects
+
+projects:
+  - name: "My Project"
+    description: "Brief description of what the project does"
+    tech_stack:
+      - "python"
+      - "react"
+    pain_points:
+      - "Context window limitations"
+      - "Slow inference"
+    looking_for:
+      - "memory management solutions"
+      - "optimization techniques"
+
+  # Add more projects as needed
+  # - name: "Another Project"
+  #   description: "..."
+  #   tech_stack: [...]
+  #   pain_points: [...]
+  #   looking_for: [...]

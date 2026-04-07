@@ -1,0 +1,36 @@
+# Your personal profile - the agent uses this to understand what matters to you
+# Copy this file to profile.yaml and fill in your details
+
+name: "Your Name"
+role: "Your role (e.g., Game developer and AI builder)"
+
+interests:
+  primary:
+    - "AI agents"
+    - "Game development"
+    # Add your main interests
+  secondary:
+    - "MCP servers"
+    - "Developer tools"
+    # Add secondary interests
+  avoid:
+    - "AI policy drama"
+    - "Hype pieces"
+    - "Pure speculation"
+    # Topics you want filtered out
+
+categories:
+  top_news:
+    description: "Major AI industry events, releases, acquisitions, policy changes"
+    weight: 1.0
+  game_dev_ai:
+    description: "AI + game development, design, gaming industry"
+    weight: 1.0
+  project_relevant:
+    description: "Repos, tools, news relevant to your active projects"
+    weight: 1.5
+  general_ai:
+    description: "Notable AI developments"
+    weight: 0.8
+
+tone: "Direct, no bullshit. Facts and links only."

@@ -1,0 +1,29 @@
+# Override or extend default sources
+# Copy this file to sources.yaml
+
+# Add extra RSS feeds
+rss:
+  custom:
+    # - name: "My Newsletter"
+    #   url: "https://example.com/feed"
+    #   category: ai_news
+
+# Add Twitter/X accounts to follow (requires RSSHub)
+twitter:
+  accounts:
+    # - "@AnthropicAI"
+    # - "@OpenAI"
+    # - "@kaboretk"
+
+# Add extra GitHub search queries
+github:
+  extra_search_queries:
+    # - "my specific topic"
+  extra_watch_orgs:
+    # - "my-org"
+
+# Add extra subreddits
+reddit:
+  extra_subreddits:
+    # - name: "MySubreddit"
+    #   category: ai_news

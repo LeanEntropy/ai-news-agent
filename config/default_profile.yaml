@@ -1,0 +1,33 @@
+# Default example profile - copy to user_config/profile.yaml and customize
+name: "User"
+role: "AI enthusiast and developer"
+
+interests:
+  primary:
+    - "AI agents and autonomous systems"
+    - "Large language models"
+    - "Developer tools and productivity"
+  secondary:
+    - "Open source projects"
+    - "Startup news"
+    - "Research papers"
+  avoid:
+    - "Celebrity AI takes"
+    - "Pure speculation pieces"
+    - "Clickbait"
+
+categories:
+  top_news:
+    description: "Major AI industry events, releases, acquisitions, policy changes"
+    weight: 1.0
+  game_dev_ai:
+    description: "AI applied to game development, design, and the gaming industry"
+    weight: 1.0
+  project_relevant:
+    description: "Repos, tools, and news relevant to your active projects"
+    weight: 1.0
+  general_ai:
+    description: "Notable AI developments that don't fit other categories"
+    weight: 0.8
+
+tone: "Direct and concise. Facts and links, no hype or drama."

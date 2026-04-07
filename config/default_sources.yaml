@@ -1,0 +1,101 @@
+rss:
+  ai_news:
+    - name: Anthropic Blog
+      url: https://www.anthropic.com/blog/rss.xml
+      category: ai_news
+    - name: OpenAI Blog
+      url: https://openai.com/blog/rss.xml
+      category: ai_news
+    - name: Google AI Blog
+      url: https://blog.google/technology/ai/rss/
+      category: ai_news
+    - name: Meta AI Blog
+      url: https://ai.meta.com/blog/rss/
+      category: ai_news
+    - name: TechCrunch AI
+      url: https://techcrunch.com/category/artificial-intelligence/feed/
+      category: ai_news
+    - name: The Verge AI
+      url: https://www.theverge.com/rss/ai-artificial-intelligence/index.xml
+      category: ai_news
+    - name: VentureBeat AI
+      url: https://venturebeat.com/category/ai/feed/
+      category: ai_news
+    - name: Ars Technica AI
+      url: https://arstechnica.com/ai/feed/
+      category: ai_news
+    - name: TLDR AI
+      url: https://tldr.tech/ai/rss
+      category: ai_news
+    - name: Import AI
+      url: https://importai.substack.com/feed
+      category: ai_news
+
+  game_dev:
+    - name: Game Developer
+      url: https://www.gamedeveloper.com/rss.xml
+      category: game_dev
+    - name: GamesIndustry.biz
+      url: https://www.gamesindustry.biz/feed
+      category: game_dev
+    - name: 80 Level
+      url: https://80.lv/feed/
+      category: game_dev
+
+  research:
+    - name: arXiv cs.AI
+      url: https://rss.arxiv.org/rss/cs.AI
+      category: research
+    - name: Papers With Code
+      url: https://paperswithcode.com/latest/feed
+      category: research
+
+github:
+  trending:
+    languages: ["python", "typescript", "rust", "c++"]
+    since: daily
+  search_queries:
+    - "mcp server"
+    - "ai agent framework"
+    - "llm tool"
+    - "game ai"
+    - "procedural generation"
+  watch_orgs:
+    - anthropics
+    - openai
+    - langchain-ai
+    - unity-technologies
+    - godotengine
+
+reddit:
+  subreddits:
+    - name: MachineLearning
+      category: ai_news
+    - name: artificial
+      category: ai_news
+    - name: LocalLLaMA
+      category: ai_news
+    - name: gamedev
+      category: game_dev
+    - name: indiegaming
+      category: game_dev
+    - name: proceduralgeneration
+      category: game_dev
+
+hackernews:
+  keywords:
+    - "AI"
+    - "LLM"
+    - "GPT"
+    - "Claude"
+    - "machine learning"
+    - "game dev"
+    - "procedural"
+    - "MCP"
+    - "agent"
+  min_score: 50
+
+twitter:
+  # Requires RSSHub instance or nitter
+  # Configure accounts in user_config/sources.yaml
+  accounts: []

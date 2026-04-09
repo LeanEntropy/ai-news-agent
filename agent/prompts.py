@@ -39,6 +39,11 @@ DIGEST_TASK_PROMPT = """Review the following collected articles and produce a cu
 
 CRITICAL: Only include articles from the LAST 48 HOURS. Anything older than 2 days should be excluded unless it's a major event the user hasn't seen yet. Articles from the last 24 hours get priority over everything else. If an article has no date, assume it's recent only if it discusses current events.
 
+Preference data from user's history:
+{preferences}
+
+Use these preferences to adjust your scoring — boost topics and sources the user engages with, deprioritize those they consistently reject.
+
 For each article, decide:
 1. Which category it belongs to (TOP_NEWS, GAME_DEV_AI, PROJECT_RELEVANT, GENERAL_AI)
 2. Its importance_score (0-10) and relevance_score (0-10)

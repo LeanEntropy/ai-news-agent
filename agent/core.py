@@ -180,7 +180,8 @@ class AgentCore:
             for a in articles[:50]
         )
 
-        prompt = DIGEST_TASK_PROMPT.format(articles=article_text)
+        preference_text = await self.preferences.format_for_scoring()
+        prompt = DIGEST_TASK_PROMPT.format(articles=article_text, preferences=preference_text or "No preference data yet.")
         messages = [{"role": "user", "content": prompt}]
         response = await self._run_agent_loop(messages, use_tools=False)
 

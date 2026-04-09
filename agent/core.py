@@ -15,6 +15,8 @@ from agent.tools import TOOL_SCHEMAS, execute_tool
 from config import settings
 from llm.base import LLMProvider
 from memory.conversation import ConversationMemory
+from memory.knowledge import KnowledgeManager
+from memory.preference_engine import PreferenceEngine
 from memory.store import Database
 from memory.user_profile import UserProfile
 
@@ -29,6 +31,8 @@ class AgentCore:
         self.db = db
         self.profile = profile
         self.conversation = ConversationMemory(db)
+        self.knowledge = KnowledgeManager(db)
+        self.preferences = PreferenceEngine(db)
         self._sources_config = self._load_sources()
 
     def _load_sources(self) -> dict:
@@ -81,7 +85,10 @@ class AgentCore:
 
     async def _build_system(self) -> str:
         pref_summary = await self._get_preference_summary()
-        return build_system_prompt(self.profile.get_profile_summary(), pref_summary)
+        knowledge_summary = await self.knowledge.format_for_prompt()
+        preference_scores = await self.preferences.format_for_scoring()
+        combined_prefs = "\n".join(filter(None, [pref_summary, preference_scores]))
+        return build_system_prompt(self.profile.get_profile_summary(), combined_prefs, knowledge_summary)
 
     async def _run_agent_loop(
         self, messages: list[dict], system: str = "", use_tools: bool = True
@@ -125,6 +132,20 @@ class AgentCore:
 
         response = await self._run_agent_loop(messages)
         await self.conversation.add("assistant", response)
+
+        # Extract knowledge from this exchange (non-blocking best-effort)
+        try:
+            convo_text = f"User: {user_message}\nAssistant: {response}"
+            extraction_prompt = self.knowledge.get_extraction_prompt(convo_text)
+            extract_messages = [{"role": "user", "content": extraction_prompt}]
+            extract_response = await self.llm.chat(messages=extract_messages, system="Extract knowledge items. Return JSON array only.")
+            items = json.loads(self._extract_json(extract_response.content))
+            if isinstance(items, list) and items:
+                await self.knowledge.store_items(items)
+                logger.info(f"Extracted {len(items)} knowledge items from conversation")
+        except Exception as e:
+            logger.debug(f"Knowledge extraction skipped: {e}")
+
         return response
 
     async def compile_digest(self, force: bool = False) -> list[dict]:

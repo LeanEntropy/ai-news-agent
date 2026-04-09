@@ -1,7 +1,7 @@
 """System prompts and templates for the agent."""
 
 
-def build_system_prompt(profile_summary: str, preference_summary: str = "") -> str:
+def build_system_prompt(profile_summary: str, preference_summary: str = "", knowledge_summary: str = "") -> str:
     return f"""You are an autonomous AI news agent - a knowledgeable insider who monitors the AI landscape and surfaces what matters to your user.
 
 ## Your User
@@ -27,6 +27,8 @@ Rate each item:
 - Combine into final_score factoring in the user's category weights
 
 {f"## Learned Preferences{chr(10)}{preference_summary}" if preference_summary else ""}
+
+{f"## What You Know About This User{chr(10)}{knowledge_summary}" if knowledge_summary else ""}
 
 ## Output Style
 {profile_summary.split("Preferred tone: ")[-1] if "Preferred tone: " in profile_summary else "Direct and concise. Facts and links only."}

@@ -72,6 +72,15 @@ class Scheduler:
             misfire_grace_time=600,
         )
 
+        # Knowledge decay - daily at 4am
+        self.scheduler.add_job(
+            self._knowledge_decay,
+            CronTrigger(hour=4, minute=0),
+            id="knowledge_decay",
+            name="Knowledge decay",
+            misfire_grace_time=600,
+        )
+
         # Run initial source scan on startup
         self.scheduler.add_job(
             self._source_scan,
@@ -110,6 +119,13 @@ class Scheduler:
                 logger.info(f"No items for {period} digest")
         except Exception as e:
             logger.error(f"Digest failed: {e}")
+
+    async def _knowledge_decay(self):
+        try:
+            await self.db.decay_knowledge(inactive_days=7)
+            logger.info("Knowledge decay complete")
+        except Exception as e:
+            logger.error(f"Knowledge decay failed: {e}")
 
     async def _update_preferences(self):
         try:

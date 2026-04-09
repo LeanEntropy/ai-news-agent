@@ -1,7 +1,10 @@
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 CONFIG_DIR = BASE_DIR / "config"
 USER_CONFIG_DIR = BASE_DIR / "user_config"
 DATA_DIR = BASE_DIR / "data"
@@ -34,6 +37,9 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 # Database
 DB_PATH = DATA_DIR / "agent.db"
+
+# Web review page
+WEBAPP_URL = os.getenv("WEBAPP_URL", "")
 
 # Digest settings
 MAX_ARTICLES_PER_CATEGORY = 5

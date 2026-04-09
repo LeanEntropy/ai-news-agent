@@ -2,7 +2,7 @@
 
 import logging
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -14,7 +14,7 @@ from telegram.ext import (
 
 from config import settings
 from memory.store import Database
-from telegram.formatter import format_digest, format_discovery, format_stats
+from delivery.formatter import format_digest, format_discovery, format_stats
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +39,7 @@ class TelegramBot:
         self._app.add_handler(CommandHandler("search", self._cmd_search))
         self._app.add_handler(CommandHandler("status", self._cmd_status))
         self._app.add_handler(CommandHandler("preferences", self._cmd_preferences))
+        self._app.add_handler(CommandHandler("review", self._cmd_review))
         self._app.add_handler(CommandHandler("help", self._cmd_help))
         self._app.add_handler(CallbackQueryHandler(self._handle_callback))
         self._app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message))
@@ -79,8 +80,12 @@ class TelegramBot:
     async def _cmd_digest(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self._is_authorized(update):
             return
-        await update.message.reply_text("Compiling digest...")
         digest_items = await self.agent.compile_digest()
+        if digest_items and len(digest_items) == 1 and digest_items[0].get("_cooldown"):
+            mins = digest_items[0].get("_remaining_minutes", 0)
+            await update.message.reply_text(f"Cooldown active. Next digest available in ~{mins} minutes.")
+            return
+        await update.message.reply_text("Compiling digest...")
         if digest_items:
             await self._send_digest_messages(update.effective_chat.id, digest_items, "on-demand")
         else:
@@ -101,7 +106,7 @@ class TelegramBot:
         if not self._is_authorized(update):
             return
         stats = await self.db.get_stats()
-        await update.message.reply_text(format_stats(stats), parse_mode="Markdown")
+        await update.message.reply_text(format_stats(stats), parse_mode="HTML")
 
     async def _cmd_preferences(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self._is_authorized(update):
@@ -120,6 +125,21 @@ class TelegramBot:
         else:
             text = "No preferences learned yet. React to digest items to teach me your preferences."
         await update.message.reply_text(text)
+
+    async def _cmd_review(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self._is_authorized(update):
+            return
+        webapp_url = settings.WEBAPP_URL
+        if not webapp_url:
+            await update.message.reply_text("Review page not configured. Set WEBAPP_URL in .env")
+            return
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("Open Review Page", web_app=WebAppInfo(url=webapp_url))]
+        ])
+        await update.message.reply_text(
+            "Review and rate articles, bookmark items for later:",
+            reply_markup=keyboard,
+        )
 
     async def _cmd_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self._is_authorized(update):
@@ -201,14 +221,14 @@ class TelegramBot:
                 await self._app.bot.send_message(
                     chat_id=chat_id,
                     text=msg,
-                    parse_mode="MarkdownV2",
+                    parse_mode="HTML",
                     disable_web_page_preview=True,
                 )
-            except Exception:
-                # Fallback to plain text if markdown fails
+            except Exception as e:
+                logger.warning(f"HTML send failed: {e}")
                 await self._app.bot.send_message(
                     chat_id=chat_id,
-                    text=msg.replace("\\", ""),
+                    text=msg.replace("<b>", "").replace("</b>", "").replace("<i>", "").replace("</i>", ""),
                     disable_web_page_preview=True,
                 )
 

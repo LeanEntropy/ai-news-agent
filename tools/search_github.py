@@ -97,6 +97,34 @@ async def get_repo_releases(owner_repo: str, max_results: int = 5) -> list[dict]
         return []
 
 
+async def get_org_recent_repos(org: str, max_results: int = 5) -> list[dict]:
+    """Get recently updated repos from an org."""
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(
+                f"{GITHUB_API}/orgs/{org}/repos",
+                params={"sort": "updated", "per_page": max_results, "type": "public"},
+                headers=_headers(),
+            )
+            response.raise_for_status()
+            repos = response.json()
+
+        results = []
+        for repo in repos:
+            results.append({
+                "name": repo["full_name"],
+                "url": repo["html_url"],
+                "description": repo.get("description") or "",
+                "stars": repo["stargazers_count"],
+                "language": repo.get("language") or "",
+                "updated_at": repo.get("updated_at", ""),
+            })
+        return results
+    except Exception as e:
+        logger.error(f"Failed to get repos for org {org}: {e}")
+        return []
+
+
 TOOL_SCHEMA = {
     "name": "search_github",
     "description": "Search GitHub for repositories, trending projects, and releases. Use to find new tools, libraries, MCP servers, and repos relevant to specific topics or projects.",

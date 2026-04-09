@@ -5,7 +5,7 @@ import signal
 from config import settings
 from memory.store import Database
 from tasks.scheduler import Scheduler
-from telegram.bot import TelegramBot
+from delivery.bot import TelegramBot
 from agent.core import AgentCore
 from llm.factory import create_llm_provider
 from memory.user_profile import UserProfile
@@ -43,6 +43,10 @@ async def main():
         loop.add_signal_handler(sig, handle_signal)
 
     logger.info("Starting AI News Agent...")
+
+    # Start web review page
+    from web_server import start_web_server
+    start_web_server(port=8080)
 
     # Start bot and scheduler
     await bot.start()

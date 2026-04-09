@@ -127,18 +127,36 @@ class AgentCore:
         await self.conversation.add("assistant", response)
         return response
 
-    async def compile_digest(self) -> list[dict]:
-        """Compile a news digest from collected articles."""
+    async def compile_digest(self, force: bool = False) -> list[dict]:
+        """Compile a news digest from collected articles.
+
+        Args:
+            force: If True, skip the cooldown check.
+        """
+        # Cooldown: minimum 2 hours between digests
+        if not force:
+            last = await self.db.get_preference("last_digest_time")
+            if last:
+                from datetime import datetime, timezone
+                last_time = datetime.fromisoformat(last["time"])
+                elapsed = (datetime.now(timezone.utc) - last_time).total_seconds()
+                if elapsed < 7200:  # 2 hours
+                    remaining = int((7200 - elapsed) / 60)
+                    return [{"_cooldown": True, "_remaining_minutes": remaining}]
+
         articles = await self.db.get_unscored_articles()
         if not articles:
             articles = await self.db.get_undelivered_articles()
         if not articles:
             return []
 
-        # Prepare articles for the LLM
-        article_text = "\n".join(
-            f"[ID:{a['id']}] {a['title']} ({a['source_name']}) - {a['url']}\n{a['content'][:300]}"
-            for a in articles[:50]  # Cap to avoid huge prompts
+        # Prepare articles for the LLM - include date for recency judgment
+        from datetime import datetime as _dt, timezone as _tz
+        now_str = _dt.now(_tz.utc).strftime("%Y-%m-%d %H:%M UTC")
+        article_text = f"Current time: {now_str}\n\n"
+        article_text += "\n".join(
+            f"[ID:{a['id']}] [Published: {a.get('published_at', 'unknown')[:16]}] {a['title']} ({a['source_name']}) - {a['url']}\n{a['content'][:300]}"
+            for a in articles[:50]
         )
 
         prompt = DIGEST_TASK_PROMPT.format(articles=article_text)
@@ -146,20 +164,24 @@ class AgentCore:
         response = await self._run_agent_loop(messages, use_tools=False)
 
         # Parse response
+        logger.info(f"Digest LLM response length: {len(response)}, first 500 chars: {response[:500]}")
         try:
-            data = json.loads(self._extract_json(response))
+            extracted = self._extract_json(response)
+            data = json.loads(extracted)
             digest_items = data.get("digest", [])
-        except (json.JSONDecodeError, KeyError):
-            logger.error("Failed to parse digest response")
+            logger.info(f"Parsed {len(digest_items)} digest items")
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.error(f"Failed to parse digest response: {e}")
+            logger.error(f"Raw response: {response[:1000]}")
             return []
 
-        # Update scores in DB
+        # Update scores in DB and enrich items with article data (url, title, source)
+        enriched = []
         for item in digest_items:
             article_id = item.get("article_id")
             if article_id:
                 importance = item.get("importance_score", 0)
                 relevance = item.get("relevance_score", 0)
-                # Apply category weight
                 cat = item.get("category", "general_ai").lower()
                 weight = self.profile.categories.get(cat, type("", (), {"weight": 1.0})).weight
                 final = (importance * 0.4 + relevance * 0.6) * weight
@@ -173,7 +195,20 @@ class AgentCore:
                     summary=item.get("summary", ""),
                 )
 
-        return digest_items
+                # Enrich with DB data
+                article = await self.db.get_article_by_id(article_id)
+                if article:
+                    item["url"] = item.get("url") or article.get("url", "")
+                    item["title"] = item.get("title") or article.get("title", "")
+                    item["source_name"] = item.get("source_name") or article.get("source_name", "")
+
+            enriched.append(item)
+
+        # Record digest time for cooldown
+        from datetime import datetime as _dt, timezone as _tz
+        await self.db.set_preference("last_digest_time", {"time": _dt.now(_tz.utc).isoformat()})
+
+        return enriched
 
     async def discover_repos(self) -> list[dict]:
         """Proactively search for repos relevant to user's projects."""
@@ -260,7 +295,7 @@ class AgentCore:
         return await self._run_agent_loop(messages)
 
     async def collect_from_sources(self) -> int:
-        """Collect articles from all configured sources. Returns count of new articles."""
+        """Collect from social sources. Repos surface via what people are talking about, not GitHub search."""
         from tools.fetch_rss import fetch_rss
         from tools.fetch_hackernews import fetch_hackernews
         from tools.fetch_reddit import fetch_reddit
@@ -268,7 +303,7 @@ class AgentCore:
 
         new_count = 0
 
-        # RSS
+        # RSS - company announcements only
         feeds = []
         for group_feeds in self._sources_config.get("rss", {}).values():
             if isinstance(group_feeds, list):
@@ -281,7 +316,7 @@ class AgentCore:
                 if result:
                     new_count += 1
 
-        # Hacker News
+        # Hacker News - repos and tools surface here organically
         hn_config = self._sources_config.get("hackernews", {})
         hn_articles = await fetch_hackernews(
             keywords=hn_config.get("keywords", []),
@@ -295,7 +330,7 @@ class AgentCore:
             if result:
                 new_count += 1
 
-        # Reddit
+        # Reddit - practitioner subs where people share repos and tools
         subs = self._sources_config.get("reddit", {}).get("subreddits", [])
         if subs:
             reddit_articles = await fetch_reddit(subs)

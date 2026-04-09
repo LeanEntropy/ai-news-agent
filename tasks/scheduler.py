@@ -102,7 +102,7 @@ class Scheduler:
 
     async def _digest(self, period: str = "morning"):
         try:
-            digest_items = await self.agent.compile_digest()
+            digest_items = await self.agent.compile_digest(force=True)
             if digest_items:
                 await self.bot.send_digest(digest_items, period)
                 logger.info(f"{period.title()} digest sent with {len(digest_items)} items")

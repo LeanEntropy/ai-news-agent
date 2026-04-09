@@ -35,13 +35,15 @@ Rate each item:
 
 DIGEST_TASK_PROMPT = """Review the following collected articles and produce a curated digest.
 
+CRITICAL: Only include articles from the LAST 48 HOURS. Anything older than 2 days should be excluded unless it's a major event the user hasn't seen yet. Articles from the last 24 hours get priority over everything else. If an article has no date, assume it's recent only if it discusses current events.
+
 For each article, decide:
 1. Which category it belongs to (TOP_NEWS, GAME_DEV_AI, PROJECT_RELEVANT, GENERAL_AI)
 2. Its importance_score (0-10) and relevance_score (0-10)
 3. A concise 1-3 sentence summary (facts only, no hype)
-4. Whether it's worth including in the digest
+4. Whether it's worth including - SKIP old news, generic content, and things that aren't actionable
 
-Select the top articles per category. For PROJECT_RELEVANT items, explain specifically which project benefits and why.
+Select the top articles per category. For PROJECT_RELEVANT items, explain specifically which project benefits and why. If an article links to a GitHub repo, include the repo URL.
 
 Articles to review:
 {articles}

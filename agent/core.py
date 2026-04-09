@@ -323,6 +323,12 @@ class AgentCore:
         response = await self._run_agent_loop(messages)
         await self.conversation.add("assistant", response)
 
+        await self.preferences.record_signal(
+            signal_type="tip_submitted",
+            topic="user_tip",
+            source_name="User Tip",
+        )
+
         # Store the tip as an article so it appears in the review page
         for url in urls:
             await self.db.insert_article(

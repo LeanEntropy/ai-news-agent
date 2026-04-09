@@ -196,14 +196,34 @@ class TelegramBot:
 
         if action in ("relevant", "not_for_me"):
             await self.db.add_feedback(article_id, action)
+            # Record engagement signal with topic extraction
+            article = await self.db.get_article_by_id(article_id)
+            if article:
+                signal_type = "feedback_positive" if action == "relevant" else "feedback_negative"
+                await self.agent.preferences.record_signal(
+                    signal_type=signal_type,
+                    topic=article.get("category", ""),
+                    source_name=article.get("source_name", ""),
+                    category=article.get("category", ""),
+                    article_id=article_id,
+                )
             emoji = "noted" if action == "relevant" else "noted, less of this"
             await query.edit_message_reply_markup(reply_markup=None)
-            # Send a brief acknowledgment
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
                 text=f"Feedback: {emoji}",
             )
         elif action == "deep_dive":
+            # Record deep dive as strong positive signal
+            article = await self.db.get_article_by_id(article_id)
+            if article:
+                await self.agent.preferences.record_signal(
+                    signal_type="deep_dive",
+                    topic=article.get("category", ""),
+                    source_name=article.get("source_name", ""),
+                    category=article.get("category", ""),
+                    article_id=article_id,
+                )
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
                 text="Fetching deep dive...",

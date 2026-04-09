@@ -293,7 +293,49 @@ Phase 4: Smarter Scoring & Delivery  (depends on Phase 2 + 3 for preference data
 Phase 5: Conversation Intelligence  (depends on Phase 1 + 2 for context assembly)
 ```
 
-**Phases 1 and 2 can be implemented in parallel.** Phase 3 builds on Phase 1. Phases 4 and 5 integrate everything.
+**Phases 1 and 2 can be implemented in parallel.** Phase 3 builds on Phase 1. Phases 4 and 5 integrate everything. Phase 6 can start anytime once a provider is chosen.
+
+### Phase 6: Twitter/X Integration via TwitterAPI.io
+
+**Goal:** Add Twitter/X as a primary source for discovering repos, tools, and announcements that practitioners are talking about.
+
+**Why TwitterAPI.io over alternatives:**
+- **Pay-per-use**: $0.15/1K tweets — no subscription trap
+- **No X account needed**: API key only, no OAuth, no app approval
+- **REST API**: Simple integration, no MCP dependency
+- **Real-time**: WebSocket/webhook support for breaking news
+- **Compared to Xpoz.ai**: Xpoz free tier is 5K credits one-time (dead end), $20/mo for next tier. TwitterAPI.io is purely usage-based.
+
+**Estimated cost:** Tracking ~30 accounts, pulling twice daily ≈ $6-14/month.
+
+**Files to create/modify:**
+- `tools/fetch_twitter.py` - Replace RSSHub approach with TwitterAPI.io REST calls
+- `config/settings.py` - Add `TWITTER_API_KEY` setting
+- `config/default_sources.yaml` - Curate initial account list
+
+**Implementation:**
+1. Sign up at twitterapi.io, get API key
+2. Replace `fetch_twitter.py` to call TwitterAPI.io endpoints instead of RSSHub RSS
+3. Add initial tracked accounts list:
+   - AI companies: @AnthropicAI, @OpenAI, @GoogleDeepMind, @huggingface
+   - AI builders: @karpathy, @ylecun, @swyx, @JeremyNHoward
+   - Game dev + AI: accounts TBD from user feedback
+   - MCP/tooling: @ClaudeCode, @LangChainAI
+4. Extract GitHub URLs from tweets — these are the repos "people are talking about"
+5. When a tweet links to a GitHub repo, auto-fetch repo metadata (stars, description) for richer context
+6. Schedule: pull new tweets every 2 hours alongside other source scans
+
+**Account curation flow:**
+- User can add/remove accounts via `/sources` Telegram command
+- Agent can suggest accounts based on engagement patterns (Phase 2 dependency)
+- Track which accounts produce content user engages with vs ignores
+
+**What this enables:**
+- "3 AI practitioners shared this new MCP server today" — social proof signal
+- Breaking announcements from company accounts within hours
+- Repo discovery via what builders are actually using and recommending
+
+---
 
 ## Estimated Scope
 
@@ -304,7 +346,8 @@ Phase 5: Conversation Intelligence  (depends on Phase 1 + 2 for context assembly
 | 3 | ~150 lines | user_profile.py, store.py, prompts.py, bot.py | profile_updates |
 | 4 | ~150 lines | core.py, prompts.py, formatter.py, scheduler.py | delivery_stats |
 | 5 | ~150 lines | core.py, prompts.py, conversation.py | (uses knowledge table) |
-| **Total** | **~900 lines** | | **6 new tables** |
+| 6 | ~100 lines | fetch_twitter.py, settings.py, default_sources.yaml | — |
+| **Total** | **~1000 lines** | | **6 new tables** |
 
 ## Design Principles
 

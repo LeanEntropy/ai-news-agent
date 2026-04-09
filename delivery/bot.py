@@ -41,6 +41,7 @@ class TelegramBot:
         self._app.add_handler(CommandHandler("preferences", self._cmd_preferences))
         self._app.add_handler(CommandHandler("review", self._cmd_review))
         self._app.add_handler(CommandHandler("help", self._cmd_help))
+        self._app.add_handler(CommandHandler("knowledge", self._cmd_knowledge))
         self._app.add_handler(CallbackQueryHandler(self._handle_callback))
         self._app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message))
 
@@ -141,6 +142,21 @@ class TelegramBot:
             reply_markup=keyboard,
         )
 
+    async def _cmd_knowledge(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self._is_authorized(update):
+            return
+        from memory.knowledge import KnowledgeManager
+        km = KnowledgeManager(self.db)
+        items = await km.get_relevant(limit=20)
+        if items:
+            text = "What I know about you:\n\n"
+            for item in items:
+                imp = f"{item['importance']:.1f}"
+                text += f"[{item['category']}] {item['content']} (importance: {imp})\n"
+        else:
+            text = "No knowledge stored yet. Chat with me to build up my understanding of you."
+        await self._send_long_message(update.effective_chat.id, text)
+
     async def _cmd_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self._is_authorized(update):
             return
@@ -151,6 +167,7 @@ class TelegramBot:
             "/review - open the web review page\n"
             "/status - agent statistics\n"
             "/preferences - view learned preferences\n"
+            "/knowledge - show what the agent remembers about you\n"
             "/help - this message\n\n"
             "Send a URL and I'll investigate it for you.\n"
             "Or just send any message to chat."

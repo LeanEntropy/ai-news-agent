@@ -280,6 +280,40 @@ class AgentCore:
         except (json.JSONDecodeError, KeyError):
             logger.error("Failed to parse preference update response")
 
+    async def investigate_tip(self, user_message: str, urls: list[str]) -> str:
+        """User sent a link or tip. Browse it, summarize, store, and explain relevance."""
+        await self.conversation.add("user", user_message)
+
+        messages = [
+            {
+                "role": "user",
+                "content": (
+                    f"The user shared this tip: {user_message}\n\n"
+                    f"URLs to investigate: {', '.join(urls)}\n\n"
+                    f"Use the browse_url tool to read each URL. Then:\n"
+                    f"1. Summarize what it is (repo, article, tool, announcement)\n"
+                    f"2. Explain why it might matter to the user's projects\n"
+                    f"3. If it's a GitHub repo: note stars, language, last update, and what problem it solves\n"
+                    f"4. If it links to other interesting repos or tools, mention those too\n"
+                    f"Be concise and factual."
+                ),
+            }
+        ]
+        response = await self._run_agent_loop(messages)
+        await self.conversation.add("assistant", response)
+
+        # Store the tip as an article so it appears in the review page
+        for url in urls:
+            await self.db.insert_article(
+                url=url,
+                title=f"User tip: {user_message[:100]}",
+                content=response[:500],
+                source_name="User Tip",
+                source_type="tip",
+            )
+
+        return response
+
     async def search_on_demand(self, query: str) -> str:
         """Handle an on-demand search request from the user."""
         messages = [

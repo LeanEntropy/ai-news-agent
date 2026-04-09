@@ -148,10 +148,12 @@ class TelegramBot:
             "Commands:\n"
             "/digest - compile and send a digest now\n"
             "/search <query> - search for repos, tools, or news\n"
+            "/review - open the web review page\n"
             "/status - agent statistics\n"
             "/preferences - view learned preferences\n"
             "/help - this message\n\n"
-            "Or just send me any message to chat!"
+            "Send a URL and I'll investigate it for you.\n"
+            "Or just send any message to chat."
         )
 
     # --- Message handling ---
@@ -160,7 +162,16 @@ class TelegramBot:
         if not self._is_authorized(update):
             return
         user_message = update.message.text
-        response = await self.agent.handle_message(user_message)
+
+        # Detect if message contains a URL - treat as a tip to investigate
+        import re
+        urls = re.findall(r'https?://\S+', user_message)
+        if urls:
+            await update.message.reply_text("Looking into that...")
+            response = await self.agent.investigate_tip(user_message, urls)
+        else:
+            response = await self.agent.handle_message(user_message)
+
         await self._send_long_message(update.effective_chat.id, response)
 
     # --- Callback handling (feedback buttons) ---

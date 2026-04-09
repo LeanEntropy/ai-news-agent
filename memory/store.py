@@ -61,11 +61,55 @@ CREATE TABLE IF NOT EXISTS discoveries (
     UNIQUE(url)
 );
 
+CREATE TABLE IF NOT EXISTS knowledge (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    content TEXT NOT NULL,
+    source TEXT DEFAULT '',
+    importance REAL DEFAULT 1.0,
+    access_count INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL,
+    last_accessed TEXT NOT NULL,
+    expires_at TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS engagement_signals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    article_id INTEGER,
+    signal_type TEXT NOT NULL,
+    topic TEXT DEFAULT '',
+    source_name TEXT DEFAULT '',
+    category TEXT DEFAULT '',
+    weight REAL DEFAULT 1.0,
+    timestamp TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS topic_scores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    topic TEXT NOT NULL UNIQUE,
+    score REAL DEFAULT 0.0,
+    sample_count INTEGER DEFAULT 0,
+    last_updated TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS source_scores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_name TEXT NOT NULL UNIQUE,
+    score REAL DEFAULT 0.0,
+    hit_count INTEGER DEFAULT 0,
+    miss_count INTEGER DEFAULT 0,
+    last_updated TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_articles_collected ON articles(collected_at);
 CREATE INDEX IF NOT EXISTS idx_articles_delivered ON articles(delivered);
 CREATE INDEX IF NOT EXISTS idx_articles_category ON articles(category);
 CREATE INDEX IF NOT EXISTS idx_articles_score ON articles(final_score DESC);
 CREATE INDEX IF NOT EXISTS idx_feedback_article ON feedback(article_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_category ON knowledge(category);
+CREATE INDEX IF NOT EXISTS idx_knowledge_importance ON knowledge(importance DESC);
+CREATE INDEX IF NOT EXISTS idx_engagement_signals_type ON engagement_signals(signal_type);
+CREATE INDEX IF NOT EXISTS idx_engagement_signals_topic ON engagement_signals(topic);
 """
 
 
@@ -262,6 +306,95 @@ class Database:
         await self.db.execute(
             f"UPDATE discoveries SET delivered = 1 WHERE id IN ({placeholders})", ids
         )
+        await self.db.commit()
+
+    # --- Knowledge ---
+
+    async def insert_knowledge(self, category: str, content: str, source: str = "") -> int:
+        now = datetime.now(timezone.utc).isoformat()
+        cursor = await self.db.execute(
+            """INSERT INTO knowledge (category, content, source, importance, access_count, created_at, last_accessed)
+               VALUES (?, ?, ?, 1.0, 0, ?, ?)""",
+            (category, content, source, now, now),
+        )
+        await self.db.commit()
+        return cursor.lastrowid
+
+    async def get_top_knowledge(self, limit: int = 20) -> list[dict]:
+        cursor = await self.db.execute(
+            "SELECT * FROM knowledge WHERE importance >= 0.3 ORDER BY importance DESC, last_accessed DESC LIMIT ?",
+            (limit,),
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    async def touch_knowledge(self, knowledge_id: int):
+        now = datetime.now(timezone.utc).isoformat()
+        await self.db.execute(
+            "UPDATE knowledge SET access_count = access_count + 1, last_accessed = ? WHERE id = ?",
+            (now, knowledge_id),
+        )
+        await self.db.commit()
+
+    async def decay_knowledge(self, inactive_days: int = 7):
+        from datetime import timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=inactive_days)).isoformat()
+        await self.db.execute(
+            "UPDATE knowledge SET importance = importance * 0.95 WHERE last_accessed < ?",
+            (cutoff,),
+        )
+        await self.db.execute(
+            "DELETE FROM knowledge WHERE importance < 0.3 AND access_count < 2",
+        )
+        await self.db.commit()
+
+    # --- Engagement Signals ---
+
+    async def add_engagement_signal(
+        self, signal_type: str, topic: str = "", source_name: str = "",
+        category: str = "", weight: float = 1.0, article_id: int | None = None,
+    ):
+        now = datetime.now(timezone.utc).isoformat()
+        await self.db.execute(
+            """INSERT INTO engagement_signals (article_id, signal_type, topic, source_name, category, weight, timestamp)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (article_id, signal_type, topic, source_name, category, weight, now),
+        )
+        await self.db.commit()
+
+    async def get_topic_scores(self) -> dict[str, float]:
+        cursor = await self.db.execute("SELECT topic, score FROM topic_scores ORDER BY ABS(score) DESC")
+        rows = await cursor.fetchall()
+        return {row["topic"]: row["score"] for row in rows}
+
+    async def update_topic_score(self, topic: str, delta: float):
+        now = datetime.now(timezone.utc).isoformat()
+        await self.db.execute(
+            """INSERT INTO topic_scores (topic, score, sample_count, last_updated) VALUES (?, ?, 1, ?)
+               ON CONFLICT(topic) DO UPDATE SET score = score * 0.9 + ? * 0.1, sample_count = sample_count + 1, last_updated = ?""",
+            (topic, delta, now, delta, now),
+        )
+        await self.db.commit()
+
+    async def get_source_scores(self) -> dict[str, dict]:
+        cursor = await self.db.execute("SELECT source_name, score, hit_count, miss_count FROM source_scores")
+        rows = await cursor.fetchall()
+        return {row["source_name"]: dict(row) for row in rows}
+
+    async def update_source_score(self, source_name: str, hit: bool):
+        now = datetime.now(timezone.utc).isoformat()
+        if hit:
+            await self.db.execute(
+                """INSERT INTO source_scores (source_name, score, hit_count, miss_count, last_updated) VALUES (?, 1.0, 1, 0, ?)
+                   ON CONFLICT(source_name) DO UPDATE SET score = score * 0.9 + 1.0 * 0.1, hit_count = hit_count + 1, last_updated = ?""",
+                (source_name, now, now),
+            )
+        else:
+            await self.db.execute(
+                """INSERT INTO source_scores (source_name, score, hit_count, miss_count, last_updated) VALUES (?, -1.0, 0, 1, ?)
+                   ON CONFLICT(source_name) DO UPDATE SET score = score * 0.9 + (-1.0) * 0.1, miss_count = miss_count + 1, last_updated = ?""",
+                (source_name, now, now),
+            )
         await self.db.commit()
 
     # --- Stats ---

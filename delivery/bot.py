@@ -42,6 +42,7 @@ class TelegramBot:
         self._app.add_handler(CommandHandler("review", self._cmd_review))
         self._app.add_handler(CommandHandler("help", self._cmd_help))
         self._app.add_handler(CommandHandler("knowledge", self._cmd_knowledge))
+        self._app.add_handler(CommandHandler("saved", self._cmd_saved))
         self._app.add_handler(CallbackQueryHandler(self._handle_callback))
         self._app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message))
 
@@ -142,6 +143,18 @@ class TelegramBot:
             reply_markup=keyboard,
         )
 
+    async def _cmd_saved(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self._is_authorized(update):
+            return
+        bookmarks = await self.db.get_bookmarks(limit=20)
+        if bookmarks:
+            text = "\U0001f516 Your saved items:\n\n"
+            for b in bookmarks:
+                text += f"\u2022 {b['title']}\n  {b['url']}\n  ({b['source_name']})\n\n"
+        else:
+            text = "No saved items yet. Tap the \U0001f516 button on any article to bookmark it."
+        await self._send_long_message(update.effective_chat.id, text)
+
     async def _cmd_knowledge(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self._is_authorized(update):
             return
@@ -168,6 +181,7 @@ class TelegramBot:
             "/status - agent statistics\n"
             "/preferences - view learned preferences\n"
             "/knowledge - show what the agent remembers about you\n"
+            "/saved - view your bookmarked articles\n"
             "/help - this message\n\n"
             "Send a URL and I'll investigate it for you.\n"
             "Or just send any message to chat."
@@ -230,6 +244,19 @@ class TelegramBot:
                 chat_id=query.message.chat_id,
                 text=f"Feedback: {emoji}",
             )
+        elif action == "bookmark":
+            is_new = await self.db.add_bookmark(article_id)
+            if is_new:
+                await context.bot.send_message(
+                    chat_id=query.message.chat_id,
+                    text="\U0001f516 Saved! Use /saved to view your bookmarks.",
+                )
+            else:
+                await self.db.remove_bookmark(article_id)
+                await context.bot.send_message(
+                    chat_id=query.message.chat_id,
+                    text="Bookmark removed.",
+                )
         elif action == "deep_dive":
             # Record deep dive as strong positive signal
             article = await self.db.get_article_by_id(article_id)
@@ -287,9 +314,9 @@ class TelegramBot:
                 continue
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("Relevant", callback_data=f"relevant:{article_id}"),
-                    InlineKeyboardButton("Not for me", callback_data=f"not_for_me:{article_id}"),
-                    InlineKeyboardButton("Deep dive", callback_data=f"deep_dive:{article_id}"),
+                    InlineKeyboardButton("Interesting", callback_data=f"relevant:{article_id}"),
+                    InlineKeyboardButton("Not relevant", callback_data=f"not_for_me:{article_id}"),
+                    InlineKeyboardButton("\U0001f516", callback_data=f"bookmark:{article_id}"),
                 ]
             ])
             title = item.get("title", item.get("summary", "")[:60])

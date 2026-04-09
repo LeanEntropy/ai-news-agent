@@ -101,6 +101,15 @@ CREATE TABLE IF NOT EXISTS source_scores (
     last_updated TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS bookmarks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    article_id INTEGER NOT NULL,
+    note TEXT DEFAULT '',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (article_id) REFERENCES articles(id),
+    UNIQUE(article_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_articles_collected ON articles(collected_at);
 CREATE INDEX IF NOT EXISTS idx_articles_delivered ON articles(delivered);
 CREATE INDEX IF NOT EXISTS idx_articles_category ON articles(category);
@@ -307,6 +316,35 @@ class Database:
             f"UPDATE discoveries SET delivered = 1 WHERE id IN ({placeholders})", ids
         )
         await self.db.commit()
+
+    # --- Bookmarks ---
+
+    async def add_bookmark(self, article_id: int) -> bool:
+        """Bookmark an article. Returns True if new, False if already bookmarked."""
+        now = datetime.now(timezone.utc).isoformat()
+        try:
+            await self.db.execute(
+                "INSERT INTO bookmarks (article_id, created_at) VALUES (?, ?)",
+                (article_id, now),
+            )
+            await self.db.commit()
+            return True
+        except aiosqlite.IntegrityError:
+            return False
+
+    async def remove_bookmark(self, article_id: int):
+        await self.db.execute("DELETE FROM bookmarks WHERE article_id = ?", (article_id,))
+        await self.db.commit()
+
+    async def get_bookmarks(self, limit: int = 50) -> list[dict]:
+        cursor = await self.db.execute(
+            """SELECT a.id, a.title, a.url, a.source_name, a.summary, b.created_at as bookmarked_at
+               FROM bookmarks b JOIN articles a ON b.article_id = a.id
+               ORDER BY b.created_at DESC LIMIT ?""",
+            (limit,),
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
 
     # --- Knowledge ---
 

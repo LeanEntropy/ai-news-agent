@@ -333,6 +333,10 @@ class TelegramBot:
         article_ids = [i["article_id"] for i in items if "article_id" in i]
         await self.db.mark_articles_delivered(article_ids)
 
+        # Archive the digest for the web repository
+        if article_ids:
+            await self.db.insert_digest_archive(period, article_ids)
+
     async def _send_long_message(self, chat_id: int, text: str):
         """Send a message, splitting if too long."""
         if not self._app:

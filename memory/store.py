@@ -101,6 +101,15 @@ CREATE TABLE IF NOT EXISTS source_scores (
     last_updated TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS digest_archives (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    period TEXT NOT NULL,
+    sent_at TEXT NOT NULL,
+    article_ids TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_digest_archives_sent ON digest_archives(sent_at DESC);
+
 CREATE TABLE IF NOT EXISTS bookmarks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     article_id INTEGER NOT NULL,
@@ -316,6 +325,33 @@ class Database:
             f"UPDATE discoveries SET delivered = 1 WHERE id IN ({placeholders})", ids
         )
         await self.db.commit()
+
+    # --- Digest Archives ---
+
+    async def insert_digest_archive(self, period: str, article_ids: list[int]) -> int:
+        now = datetime.now(timezone.utc).isoformat()
+        cursor = await self.db.execute(
+            "INSERT INTO digest_archives (period, sent_at, article_ids) VALUES (?, ?, ?)",
+            (period, now, json.dumps(article_ids)),
+        )
+        await self.db.commit()
+        return cursor.lastrowid
+
+    async def get_digest_archives(self, limit: int = 50) -> list[dict]:
+        cursor = await self.db.execute(
+            "SELECT id, period, sent_at, article_ids FROM digest_archives ORDER BY sent_at DESC LIMIT ?",
+            (limit,),
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    async def get_digest_archive(self, digest_id: int) -> dict | None:
+        cursor = await self.db.execute(
+            "SELECT id, period, sent_at, article_ids FROM digest_archives WHERE id = ?",
+            (digest_id,),
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
 
     # --- Bookmarks ---
 
